@@ -411,7 +411,7 @@ class DefaultDemux implements TSDemux
                     // SYNC_BYTE_ERROR -> SYNC_LOST
                     prev_state = curr_state;
                     curr_state = TSState.SYNC_LOST;
-                    post(new TransportStatus(DefaultDemux.this, pcct, prev_state, curr_state));
+                    post(new TransportStatus(DefaultDemux.this, read_pid(), pcct, prev_state, curr_state));
                     return;
                 }
 
@@ -422,7 +422,7 @@ class DefaultDemux implements TSDemux
 
             // FINE | SYNC_BYTE_ERROR
             if (prev_state != curr_state)
-                post(new TransportStatus(DefaultDemux.this, pcct, prev_state, curr_state));
+                post(new TransportStatus(DefaultDemux.this, read_pid(), pcct, prev_state, curr_state));
 
             if (curr_state != TSState.FINE)
                 return;
@@ -542,6 +542,11 @@ class DefaultDemux implements TSDemux
         int buffer_remaining()
         {
             return buffer_limit - buffer_position;
+        }
+
+        int read_pid()
+        {
+            return BigEndian.getUINT16(pktbuf, 1) & 0x1FFF;
         }
     }
 

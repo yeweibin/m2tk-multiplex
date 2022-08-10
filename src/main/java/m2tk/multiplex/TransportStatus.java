@@ -17,16 +17,28 @@ package m2tk.multiplex;
 
 public class TransportStatus extends TSDemuxEvent
 {
+    private final int        pid;
     private final long       position;
     private final TSState    previous;
     private final TSState    current;
 
     public TransportStatus(TSDemux source, long position, TSState previous, TSState current)
     {
+        this(source, -1, position, previous, current);
+    }
+
+    public TransportStatus(TSDemux source, int pid, long position, TSState previous, TSState current)
+    {
         super(source);
+        this.pid = pid;
         this.position = position;
         this.previous = previous;
         this.current = current;
+    }
+
+    public int getPid()
+    {
+        return pid;
     }
 
     public long getPosition()
