@@ -108,4 +108,34 @@ public interface TSDemux
      * @param channel 解复用通道
      */
     void closeChannel(Channel channel);
+
+    /**
+     * 注册解复用通道（默认打开）。
+     *
+     * @param type 负载类型
+     * @param handler 负载处理器
+     * @return 通道对象（已打开）
+     */
+    default Channel registerChannel(TSDemuxPayload.Type type, Consumer<TSDemuxPayload> handler)
+    {
+        return registerChannel(Channel.ANY_PID, type, handler);
+    }
+
+    /**
+     * 注册解复用通道（默认打开）。
+     *
+     * @param pid 流PID
+     * @param type 负载类型
+     * @param handler 负载处理器
+     * @return 通道对象（已打开）
+     */
+    default Channel registerChannel(int pid, TSDemuxPayload.Type type, Consumer<TSDemuxPayload> handler)
+    {
+        Objects.requireNonNull(handler);
+        Channel channel = requestChannel(type);
+        channel.setPayloadHandler(handler);
+        channel.setStreamPID(pid);
+        channel.setEnabled(true);
+        return channel;
+    }
 }
