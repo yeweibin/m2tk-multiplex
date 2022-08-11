@@ -18,7 +18,6 @@ package m2tk.multiplex;
 
 import m2tk.io.RxChannel;
 
-import java.io.InputStream;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
