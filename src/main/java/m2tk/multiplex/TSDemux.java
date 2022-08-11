@@ -109,29 +109,49 @@ public interface TSDemux
     void closeChannel(Channel channel);
 
     /**
-     * 注册解复用通道（默认打开）。
+     * 注册流通道（默认打开）。
      *
-     * @param type 负载类型
      * @param handler 负载处理器
      * @return 通道对象（已打开）
      */
-    default Channel registerChannel(TSDemuxPayload.Type type, Consumer<TSDemuxPayload> handler)
+    default Channel registerRawChannel(Consumer<TSDemuxPayload> handler)
     {
-        return registerChannel(Channel.ANY_PID, type, handler);
+        Objects.requireNonNull(handler);
+        Channel channel = requestChannel(TSDemuxPayload.Type.RAW);
+        channel.setPayloadHandler(handler);
+        channel.setStreamPID(Channel.ANY_PID);
+        channel.setEnabled(true);
+        return channel;
     }
 
     /**
-     * 注册解复用通道（默认打开）。
+     * 注册私有段解复用通道（默认打开）。
      *
      * @param pid 流PID
-     * @param type 负载类型
      * @param handler 负载处理器
      * @return 通道对象（已打开）
      */
-    default Channel registerChannel(int pid, TSDemuxPayload.Type type, Consumer<TSDemuxPayload> handler)
+    default Channel registerSectionChannel(int pid, Consumer<TSDemuxPayload> handler)
     {
         Objects.requireNonNull(handler);
-        Channel channel = requestChannel(type);
+        Channel channel = requestChannel(TSDemuxPayload.Type.SECTION);
+        channel.setPayloadHandler(handler);
+        channel.setStreamPID(pid);
+        channel.setEnabled(true);
+        return channel;
+    }
+
+    /**
+     * 注册PES解复用通道（默认打开）。
+     *
+     * @param pid 流PID
+     * @param handler 负载处理器
+     * @return 通道对象（已打开）
+     */
+    default Channel registerPESChannel(int pid, Consumer<TSDemuxPayload> handler)
+    {
+        Objects.requireNonNull(handler);
+        Channel channel = requestChannel(TSDemuxPayload.Type.PES);
         channel.setPayloadHandler(handler);
         channel.setStreamPID(pid);
         channel.setEnabled(true);
