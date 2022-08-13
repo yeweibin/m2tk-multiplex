@@ -239,12 +239,10 @@ class DefaultDemux implements TSDemux
                 }
             } catch (EOFException eof)
             {
-                if (logger.isInfoEnabled())
-                    logger.info("stream interrupted.");
+                logger.debug("stream interrupted.");
             } catch (Exception other)
             {
-                if (logger.isWarnEnabled())
-                    logger.warn("stream exception: {}", other.getMessage());
+                logger.warn("stream exception: {}", other.getMessage());
             } finally
             {
                 stop_reading = true;
