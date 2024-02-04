@@ -27,7 +27,10 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 /**
@@ -44,7 +47,7 @@ class DefaultDemux implements TSDemux
     {
         Arrays.fill(DUPLICATE_PACKET_MASK, (byte) 0xFF);
         Arrays.fill(DUPLICATE_PACKET_MASK, 6, 12, (byte) 0); // PCR field
-        logger = LoggerFactory.getLogger("DefaultDemux");
+        logger = LoggerFactory.getLogger(DefaultDemux.class);
     }
 
     private final List<DemuxChannel> channels;
@@ -102,15 +105,10 @@ class DefaultDemux implements TSDemux
 
         try
         {
-            task.get(10, TimeUnit.SECONDS);
-        } catch (ExecutionException | TimeoutException ex)
+            task.get();
+        } catch (ExecutionException | InterruptedException ex)
         {
-            if (logger.isDebugEnabled())
-                logger.debug("demux routine interrupted: {}", ex.getMessage(), ex);
-        } catch (InterruptedException ex)
-        {
-            if (logger.isDebugEnabled())
-                logger.debug("demux routine interrupted: {}", ex.getMessage(), ex);
+            logger.debug("demux routine interrupted: {}", ex.getMessage());
             Thread.currentThread().interrupt();
         }
 
@@ -239,7 +237,7 @@ class DefaultDemux implements TSDemux
                 }
             } catch (EOFException eof)
             {
-                logger.debug("stream interrupted.");
+                logger.debug("stream terminated.");
             } catch (Exception other)
             {
                 logger.warn("stream exception: {}", other.getMessage());
@@ -265,8 +263,7 @@ class DefaultDemux implements TSDemux
                                       listener.accept(event);
                                   } catch (RuntimeException ex)
                                   {
-                                      if (logger.isDebugEnabled())
-                                          logger.debug("listener exception: {}", ex.getMessage(), ex);
+                                      logger.debug("listener exception: {}", ex.getMessage());
                                   }
                               });
             channels.forEach(channel ->
@@ -276,8 +273,7 @@ class DefaultDemux implements TSDemux
                                      channel.handle(event);
                                  } catch (RuntimeException ex)
                                  {
-                                     if (logger.isDebugEnabled())
-                                         logger.debug("channel exception: {}", ex.getMessage(), ex);
+                                     logger.debug("channel exception: {}", ex.getMessage());
                                  }
                              });
         }
@@ -346,8 +342,7 @@ class DefaultDemux implements TSDemux
             post(new DemuxStatus(DefaultDemux.this, false));
             stop_reading = true;
 
-            if (logger.isDebugEnabled())
-                logger.debug("fail to determine packet size, stop demux.");
+            logger.debug("fail to determine packet size, stop demux.");
         }
 
         boolean keep_reading()
@@ -433,8 +428,7 @@ class DefaultDemux implements TSDemux
                                      channel.handle(packet);
                                  } catch (RuntimeException ex)
                                  {
-                                     if (logger.isDebugEnabled())
-                                         logger.debug("channel exception: {}", ex.getMessage(), ex);
+                                     logger.debug("channel exception: {}", ex.getMessage());
                                  }
                              });
         }
@@ -575,8 +569,7 @@ class DefaultDemux implements TSDemux
                     handler.accept(payload);
                 } catch (Throwable t)
                 {
-                    if (logger.isDebugEnabled())
-                        logger.debug("channel handler exception: {}", t.getMessage(), t);
+                    logger.debug("channel handler exception: {}", t.getMessage());
                 }
             }
         }
@@ -927,7 +920,7 @@ class DefaultDemux implements TSDemux
                     header_complete = false;
                     payload_complete = false;
                     bytes_required = MPEG2.SECTION_HEADER_LENGTH;
-                    return; // 从下一个正确的包开始解析。
+                    return; // 从下一个正确的传输包开始解析。
                 }
             }
 
@@ -970,7 +963,7 @@ class DefaultDemux implements TSDemux
             // 下面的代码应该是逻辑正确的，代码布局（风格）也做到了尽可能的简洁和一致，
             // 所以，请不要再“优化了”，已经为此浪费了很多时间和精力。切记！！！
             //
-            // 2016-12-29: 我又手贱的优化了，为了适应新的解码模型。好像还修正几处逻辑问题（有待验证）。
+            // 2016-12-29: 我又手贱地优化了，为了适应新的解码模型。好像还修正几处逻辑问题（有待验证）。
             // 2017-01-20: 又找到了几个错误。
 
             if (buffer_filled == 0)
