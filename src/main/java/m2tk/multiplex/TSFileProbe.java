@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Ye Weibin. All rights reserved.
+ * Copyright (c) M2TK Project. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package m2tk.multiplex;
 
 import m2tk.encoding.Encoding;
@@ -199,7 +200,7 @@ public class TSFileProbe
         return sync_point;
     }
 
-    private long buffer_remaining()
+    private int buffer_remaining()
     {
         return buffer_limit - buffer_position;
     }
@@ -294,7 +295,7 @@ public class TSFileProbe
         int offset = 0;
         while (toRead > 0)
         {
-            int available = Math.min(toRead, (int) buffer_remaining());
+            int available = Math.min(toRead, buffer_remaining());
             if (available > 0)
             {
                 System.arraycopy(buffer, buffer_position, packet, offset, available);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Ye Weibin. All rights reserved.
+ * Copyright (c) M2TK Project. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,6 @@ import m2tk.encoding.Encoding;
 import m2tk.io.RxChannel;
 import m2tk.mpeg2.MPEG2;
 import m2tk.util.BigEndian;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -41,13 +39,11 @@ class DefaultDemux implements TSDemux
     private static final int ALLOW_DUPLICATE_PACKET = 0;
     private static final int NOT_ALLOW_DUPLICATE_PACKET = 1;
     private static final byte[] DUPLICATE_PACKET_MASK = new byte[MPEG2.TS_PACKET_SIZE];
-    private static final Logger logger;
 
     static
     {
         Arrays.fill(DUPLICATE_PACKET_MASK, (byte) 0xFF);
         Arrays.fill(DUPLICATE_PACKET_MASK, 6, 12, (byte) 0); // PCR field
-        logger = LoggerFactory.getLogger(DefaultDemux.class);
     }
 
     private final List<DemuxChannel> channels;
@@ -108,7 +104,7 @@ class DefaultDemux implements TSDemux
             task.get();
         } catch (ExecutionException | InterruptedException ex)
         {
-            logger.debug("demux routine interrupted: {}", ex.getMessage());
+            System.err.println("demux routine interrupted: " + ex.getMessage());
             Thread.currentThread().interrupt();
         }
 
@@ -237,10 +233,10 @@ class DefaultDemux implements TSDemux
                 }
             } catch (EOFException eof)
             {
-                logger.debug("stream terminated.");
+                System.err.println("stream terminated.");
             } catch (Exception other)
             {
-                logger.warn("stream exception: {}", other.getMessage());
+                System.err.println("stream exception: " + other.getMessage());
             } finally
             {
                 stop_reading = true;
@@ -263,7 +259,7 @@ class DefaultDemux implements TSDemux
                                       listener.accept(event);
                                   } catch (RuntimeException ex)
                                   {
-                                      logger.debug("listener exception: {}", ex.getMessage());
+                                      System.err.println("listener exception: " + ex.getMessage());
                                   }
                               });
             channels.forEach(channel ->
@@ -273,7 +269,7 @@ class DefaultDemux implements TSDemux
                                      channel.handle(event);
                                  } catch (RuntimeException ex)
                                  {
-                                     logger.debug("channel exception: {}", ex.getMessage());
+                                     System.err.println("channel exception: " + ex.getMessage());
                                  }
                              });
         }
@@ -342,7 +338,7 @@ class DefaultDemux implements TSDemux
             post(new DemuxStatus(DefaultDemux.this, false));
             stop_reading = true;
 
-            logger.debug("fail to determine packet size, stop demux.");
+            System.err.println("fail to determine packet size, stop demux.");
         }
 
         boolean keep_reading()
@@ -428,7 +424,7 @@ class DefaultDemux implements TSDemux
                                      channel.handle(packet);
                                  } catch (RuntimeException ex)
                                  {
-                                     logger.debug("channel exception: {}", ex.getMessage());
+                                     System.err.println("channel exception: " + ex.getMessage());
                                  }
                              });
         }
@@ -569,7 +565,7 @@ class DefaultDemux implements TSDemux
                     handler.accept(payload);
                 } catch (Throwable t)
                 {
-                    logger.debug("channel handler exception: {}", t.getMessage());
+                    System.err.println("channel handler exception: {}" + t.getMessage());
                 }
             }
         }
