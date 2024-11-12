@@ -236,7 +236,8 @@ class DefaultDemux implements TSDemux
                 System.err.println("stream terminated.");
             } catch (Exception other)
             {
-                System.err.println("stream exception: " + other.getMessage());
+                System.err.println("stream exception: ");
+                other.printStackTrace(System.err);
             } finally
             {
                 stop_reading = true;
@@ -565,7 +566,8 @@ class DefaultDemux implements TSDemux
                     handler.accept(payload);
                 } catch (Throwable t)
                 {
-                    System.err.println("channel handler exception: {}" + t.getMessage());
+                    System.err.println("channel handler exception: ");
+                    t.printStackTrace(System.err);
                 }
             }
         }
