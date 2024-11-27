@@ -135,7 +135,7 @@ class DefaultDemux implements TSDemux
     public void reset()
     {
         if (!stop_reading)
-            throw new IllegalStateException("解复用器正在工作。");
+            throw new IllegalStateException("Demux is running...");
 
         channels.clear();
         listeners.clear();
@@ -231,9 +231,8 @@ class DefaultDemux implements TSDemux
 
                     report_traffic();
                 }
-            } catch (EOFException eof)
+            } catch (EOFException ignored)
             {
-                System.err.println("stream terminated.");
             } catch (Exception other)
             {
                 System.err.println("stream exception: ");
