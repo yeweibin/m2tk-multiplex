@@ -6,7 +6,7 @@
 
     <groupId>mpeg2-toolkit</groupId>
     <artifactId>m2tk-multiplex</artifactId>
-    <version>1.2.1</version>
+    <version>1.2.2</version>
     <name>m2tk-multiplex</name>
 
     <properties>
@@ -22,12 +22,12 @@
         <dependency>
             <groupId>mpeg2-toolkit</groupId>
             <artifactId>m2tk-core</artifactId>
-            <version>1.2.1</version>
+            <version>1.2.2</version>
         </dependency>
         <dependency>
             <groupId>mpeg2-toolkit</groupId>
             <artifactId>m2tk-io</artifactId>
-            <version>1.2.1</version>
+            <version>1.2.2</version>
         </dependency>
     </dependencies>
 
