@@ -722,6 +722,15 @@ class DefaultDemux implements TSDemux
             dupflag = ALLOW_DUPLICATE_PACKET;
             encoding.copyRange(0, MPEG2.TS_PACKET_SIZE, pktbuf);
 
+            // Scrambling Control
+            int control = (encoding.readUINT8(3) & 0b1100_0000) >>> 6;
+            if (control != 0b00)
+            {
+                // TS层加扰，无法重组PES包。
+                buffer.reset();
+                return;
+            }
+
             // TS中封装PES的规则：
             // 1. PES包的起始字节必须位于TS包有效负载的开始，并且将该TS包的payload_unit_start_indicator置为1。
             //    如果PES包比TS包还小（填不满TS负载），则需要使用适配域（AdaptationField）进行填充（在PES之间前挤占多余的TS空间）。
@@ -732,7 +741,7 @@ class DefaultDemux implements TSDemux
             // 4. 结合1/2得到，多个PES不能首尾相接地出现在同一个TS包中，这一点与Section封装不同。
 
             // Adaptation Field Control
-            int control = (encoding.readUINT8(3) & 0b0011_0000) >>> 4;
+            control = (encoding.readUINT8(3) & 0b0011_0000) >>> 4;
             if (control == 0b00 || control == 0b10)
                 dupflag = NOT_ALLOW_DUPLICATE_PACKET;
             int payload_start = MPEG2.TS_PACKET_HEADER_SIZE;
