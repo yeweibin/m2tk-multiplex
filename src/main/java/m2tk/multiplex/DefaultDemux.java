@@ -261,6 +261,7 @@ class DefaultDemux implements TSDemux
                                   } catch (RuntimeException ex)
                                   {
                                       System.err.println("listener exception: " + ex.getMessage());
+                                      ex.printStackTrace(System.err);
                                   }
                               });
             channels.forEach(channel ->
@@ -271,6 +272,7 @@ class DefaultDemux implements TSDemux
                                  } catch (RuntimeException ex)
                                  {
                                      System.err.println("channel exception: " + ex.getMessage());
+                                     ex.printStackTrace(System.err);
                                  }
                              });
         }
@@ -426,6 +428,7 @@ class DefaultDemux implements TSDemux
                                  } catch (RuntimeException ex)
                                  {
                                      System.err.println("channel exception: " + ex.getMessage());
+                                     ex.printStackTrace(System.err);
                                  }
                              });
         }
@@ -738,7 +741,7 @@ class DefaultDemux implements TSDemux
 
             // Payload Unit Start Indicator
             indicator = encoding.readUINT8(1) & 0b0100_0000;
-            if (indicator != 0)
+            if (indicator != 0 && buffer.size() > MPEG2.PES_PACKET_HEADER_LENGTH)
             {
                 // 结束上一个PES包
                 byte[] data = buffer.toByteArray();
