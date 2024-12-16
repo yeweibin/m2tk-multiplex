@@ -21,6 +21,7 @@ import m2tk.io.RxChannel;
 import m2tk.mpeg2.MPEG2;
 import m2tk.util.BigEndian;
 
+import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.Arrays;
@@ -638,8 +639,7 @@ class DefaultDemux implements TSDemux
     {
         int dupflag;
         byte[] pktbuf;
-        byte[] buffer;
-        int buffer_filled;
+        ByteArrayOutputStream buffer;
         int last_cct;
         long start_pct;  // PES包首字节所在包的计数器
         long finish_pct; // PES包末字节所在包的计数器
@@ -648,8 +648,7 @@ class DefaultDemux implements TSDemux
         {
             dupflag = ALLOW_DUPLICATE_PACKET;
             pktbuf = new byte[MPEG2.TS_PACKET_SIZE];
-            buffer = new byte[MPEG2.MAX_PES_PACKET_LENGTH];
-            buffer_filled = 0;
+            buffer = new ByteArrayOutputStream(65536);
             last_cct = -1;
             start_pct = -1;
             finish_pct = -1;
@@ -660,8 +659,8 @@ class DefaultDemux implements TSDemux
         {
             if (channel_enabled != enabled)
             {
+                buffer.reset();
                 last_cct = -1;
-                buffer_filled = 0;
                 channel_enabled = enabled;
             }
         }
@@ -674,8 +673,8 @@ class DefaultDemux implements TSDemux
                 TransportStatus status = (TransportStatus) event;
                 if (status.getCurrentState() != TSState.FINE)
                 {
+                    buffer.reset();
                     last_cct = -1;
-                    buffer_filled = 0;
                 }
             }
         }
@@ -692,20 +691,12 @@ class DefaultDemux implements TSDemux
                 return;
 
             // Transport Error Indicator
-            int indicator = (encoding.readUINT8(1) >> 7) & 0b1;
-            if (indicator == 1)
+            int indicator = encoding.readUINT8(1) & 0b1000_0000;
+            if (indicator != 0)
             {
+                buffer.reset();
                 last_cct = -1;
-                buffer_filled = 0;
                 return; // 含有传输错误，负载数据无效。
-            }
-
-            // Adaptation Field Control
-            int control = (encoding.readUINT8(3) >> 4) & 0b11;
-            if (control == 0b00 || control == 0b10)
-            {
-                dupflag = NOT_ALLOW_DUPLICATE_PACKET;
-                return; // 当前无有效负载（这里省略了检查CCT，不过不影响解码效果）。
             }
 
             // Continuity Counter
@@ -713,13 +704,14 @@ class DefaultDemux implements TSDemux
             int prev_cct = (curr_cct - 1) & 0b1111;
             if (last_cct == curr_cct && is_duplicate_packet(encoding))
             {
+                System.err.println("duplicate packet!!!");
                 dupflag = NOT_ALLOW_DUPLICATE_PACKET;
                 return;
             }
             if (last_cct != -1 && last_cct != prev_cct)
             {
+                buffer.reset();
                 last_cct = -1;
-                buffer_filled = 0;
                 return; // 连续计数器错误
             }
 
@@ -727,31 +719,44 @@ class DefaultDemux implements TSDemux
             dupflag = ALLOW_DUPLICATE_PACKET;
             encoding.copyRange(0, MPEG2.TS_PACKET_SIZE, pktbuf);
 
-            // 重组PES非常简单，不用考虑PES包编码，仅从PayloadUnitStartByte
-            // 标志位就可以判断是否出现新的PES包，从而结束上一个PES包。
-            indicator = (encoding.readUINT8(1) >> 6) & 0b1;
-            if (indicator == 1)
+            // TS中封装PES的规则：
+            // 1. PES包的起始字节必须位于TS包有效负载的开始，并且将该TS包的payload_unit_start_indicator置为1。
+            //    如果PES包比TS包还小（填不满TS负载），则需要使用适配域（AdaptationField）进行填充（在PES之间前挤占多余的TS空间）。
+            // 2. 比TS包大的PES包，需要拆分到多个TS包里，如果最后一部分的PES分块不足以填满TS，则同样需要使用适配域填充（方法同上）。
+            //    携带PES分块的TS包，其payload_unit_start_indicator为0。
+            // 3. 原则上，从TS流中过滤重组PES数据，应该以payload_unit_start_indicator为准（速度更快，更方便），而不是在TS负载中搜索
+            //    PES的packet_start_prefix，但该字段可以作为重组后验证PES正确性的依据之一（还应该计算CRC）。
+            // 4. 结合1/2得到，多个PES不能首尾相接地出现在同一个TS包中，这一点与Section封装不同。
+
+            // Adaptation Field Control
+            int control = (encoding.readUINT8(3) & 0b0011_0000) >>> 4;
+            if (control == 0b00 || control == 0b10)
+                dupflag = NOT_ALLOW_DUPLICATE_PACKET;
+            int payload_start = MPEG2.TS_PACKET_HEADER_SIZE;
+            if (control == 0b10 || control == 0b11)
+                payload_start = MPEG2.TS_PACKET_HEADER_SIZE + 1 + encoding.readUINT8(4);
+
+            // Payload Unit Start Indicator
+            indicator = encoding.readUINT8(1) & 0b0100_0000;
+            if (indicator != 0)
             {
-                if (buffer_filled != 0)
+                // 结束上一个PES包
+                byte[] data = buffer.toByteArray();
+                if (BigEndian.getUINT24(data, 0) == 0x000001) // PES packet_start_prefix
                 {
-                    // 结束上一个PES包
+                    // 具有正确的PES起始字节
                     forward_payload(TSDemuxPayload.pes(this,
                                                        start_pct,
                                                        finish_pct,
                                                        pid,
-                                                       Encoding.wrap(buffer, 0, buffer_filled)));
+                                                       Encoding.wrap(data)));
                 }
 
-                buffer_filled = 0;
+                buffer.reset();
                 start_pct = packet.getPacketCounter();
             }
 
-            control = (encoding.readUINT8(3) >> 4) & 0b11;
-            int payload_start = (control == 0b01)
-                                ? MPEG2.TS_PACKET_HEADER_SIZE
-                                : MPEG2.TS_PACKET_HEADER_SIZE + 1 + encoding.readUINT8(4);
-            encoding.copyRange(payload_start, MPEG2.TS_PACKET_SIZE, buffer, buffer_filled);
-            buffer_filled += MPEG2.TS_PACKET_SIZE - payload_start;
+            encoding.copyRange(payload_start, MPEG2.TS_PACKET_SIZE, buffer);
 
             // 每次都更新结尾计数器，因为在不核对 PES_packet_length 的情况下
             // 无法提前知道 PES 数据是否完结。
@@ -853,14 +858,6 @@ class DefaultDemux implements TSDemux
                 return; // 含有传输错误，负载数据无效。
             }
 
-            // Adaptation Field Control
-            int control = (encoding.readUINT8(3) >> 4) & 0b11;
-            if (control == 0b00 || control == 0b10)
-            {
-                dupflag = NOT_ALLOW_DUPLICATE_PACKET;
-                return; // 当前无有效负载。
-            }
-
             // Continuity Counter
             int curr_cct = encoding.readUINT8(3) & 0b1111;
             int prev_cct = (curr_cct - 1) & 0b1111;
@@ -883,6 +880,14 @@ class DefaultDemux implements TSDemux
             curr_pct = packet.getPacketCounter();
             dupflag = ALLOW_DUPLICATE_PACKET;
             encoding.copyRange(0, MPEG2.TS_PACKET_SIZE, pktbuf);
+
+            // Adaptation Field Control
+            int control = (encoding.readUINT8(3) >> 4) & 0b11;
+            if (control == 0b00 || control == 0b10)
+            {
+                dupflag = NOT_ALLOW_DUPLICATE_PACKET;
+                return; // 当前无有效负载。
+            }
 
             // Scrambling Control
             control = (encoding.readUINT8(3) >> 6) & 0b11;
